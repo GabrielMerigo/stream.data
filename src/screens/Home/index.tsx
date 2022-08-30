@@ -20,7 +20,8 @@ import {
   TopGamesTitle
 } from './styles';
 import { UserFollowedStreamCard } from '../../components/UserFollowedStreamCard';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+const { CLIENT_ID } = process.env;
 interface TopGames {
   box_art_url: string, 
   id: string, 
@@ -50,9 +51,13 @@ export function Home() {
   const theme = useTheme();
   const { signOut, user, isLoggingOut } = useAuth();
 
-  // creates a function to handle sign out
-    // try to call and wait signOut
-    // if fails, display an Alert with the title "Erro SignOut" and message "Ocorreu um erro ao tentar se deslogar do app"
+  async function handleSignOut(){
+    try{
+      await signOut();
+    }catch(e){
+      Alert.alert('Erro SignOut', 'Ocorreu um erro ao tentar se deslogar do app.')
+    }
+  }
 
   async function getTopGames() {
     try {
@@ -81,7 +86,6 @@ export function Home() {
   async function getUserFollowedStreams() {
     try {
       const response = await api.get<{ data: UserFollowedStreams[] }>(`/streams/followed?user_id=${user.id}`);
-
       const formattedResponse = await getUserFollowedStreamsAvatar(response.data.data);
       
       if (formattedResponse) {
@@ -93,14 +97,15 @@ export function Home() {
     }
   }
 
+
   useEffect(() => {
     getTopGames();
     getUserFollowedStreams();
   }, [])
 
-  // const signOutButtonProps = {
-  //   onPress: your-signOut-function
-  // }
+  const signOutButtonProps = {
+    onPress: handleSignOut
+  }
 
   return (
     <Container
@@ -125,11 +130,12 @@ export function Home() {
           <UserInfoText style={{ fontFamily: theme.fonts.bold }}>{user.display_name}</UserInfoText>
         </UserInfo>
 
-        {/* <SignOutButton onPress={}>
-          Verify if isLoggingOut is true
-          If it is, show an ActivityIndicator
-          Otherwise, show Feather's power icon
-        </SignOutButton> */}
+        <SignOutButton {...signOutButtonProps}>
+          {isLoggingOut 
+            ? <ActivityIndicator size={25}color={theme.colors.white}  /> 
+            : <Feather size={25} color={theme.colors.white} name="power" />
+          }
+        </SignOutButton>
       </Header>
 
       <UserFollowedStreams>

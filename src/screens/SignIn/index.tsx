@@ -26,11 +26,10 @@ export function SignIn() {
   const theme = useTheme();
 
   async function handleSignIn(){
-    try{
-      return await signIn()
-
-    }catch(err){
-      throw new Error('Aconteceu um erro...')
+    try {
+      await signIn();
+    } catch (error) {
+      Alert.alert('Erro SignIn', 'Ocorreu um erro ao tentar logar no app');
     }
   }
 
@@ -73,7 +72,7 @@ export function SignIn() {
           <SignInButton {...signInButtonProps}>
             <SignInButtonIcon>
               {isLoggingIn ? (
-                <ActivityIndicator />
+                <ActivityIndicator color={theme.colors.white} />
               ) : (
                 <Feather name="twitch" size={24} color="white" />
               )}

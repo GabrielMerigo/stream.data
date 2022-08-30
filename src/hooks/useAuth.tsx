@@ -1,6 +1,7 @@
 import { makeRedirectUri, revokeAsync, startAsync } from 'expo-auth-session';
-import React, { useEffect, createContext, useContext, useState, ReactNode } from 'react';
+import React, { useEffect, createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { generateRandom } from 'expo-auth-session/build/PKCE';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { api } from '../services/api';
 
@@ -48,15 +49,27 @@ const FORCE_VERIFY = true;
 const STATE = generateRandom(30);
 
 function AuthProvider({ children }: AuthProviderData) {
-
+  const userKey = '@stream.data'
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [user, setUser] = useState({} as User);
   const [userToken, setUserToken] = useState('');
 
+  const getUser = async () => {
+    const userResponse = await AsyncStorage.getItem(userKey) as string;
+
+    if(userResponse){
+      const userFormattted = JSON.parse(userResponse);
+      setUser(userFormattted)
+    }
+  }
+
   useEffect(() => {
     api.defaults.headers.common['Client-Id'] = CLIENT_ID as string | number | boolean;
+    getUser();
   }, [])
+
+
 
   async function signIn() {
     try {
@@ -70,20 +83,36 @@ function AuthProvider({ children }: AuthProviderData) {
         `&force_verify=${FORCE_VERIFY}` +
         `&state=${STATE}`;
 
-      const { type, params } = await startAsync({ authUrl }) as AuthResponse;
+      const { type, params: {
+        error,
+        access_token,
+        state
+      } } = await startAsync({ authUrl }) as AuthResponse;
 
-      if(type === 'success' && params.error !== 'access_denied'){
-        if(params.state !== STATE){
+      if(type === 'success' && error !== 'access_denied'){
+        if(state !== STATE){
           throw new Error('Invalid state value');
         }
 
-        api.defaults.headers.common['Authorization'] = `Bearer ${params.access_token}`;
-      }
+        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        const { data } = await api.get('/users');
 
-        // set user state with response from Twitch API's route "/users"
-        // set userToken state with response's access_token from startAsync
+        const userObj = {
+          display_name: data.data[0].display_name,
+          email: data.data[0].email,
+          id: data.data[0].id,
+          profile_image_url: data.data[0].profile_image_url
+        }
+
+        setUser(userObj)
+
+        const userFormatted = JSON.stringify(userObj);
+        await AsyncStorage.setItem(userKey, userFormatted);
+
+        setUserToken(access_token);
+      }
     } catch (error) {
-      throw new Error('');
+      throw new Error();
     } finally {
       setIsLoggingIn(false)
     }
@@ -91,23 +120,18 @@ function AuthProvider({ children }: AuthProviderData) {
 
   async function signOut() {
     try {
-      // set isLoggingOut to true
-
-      // call revokeAsync with access_token, client_id and twitchEndpoint revocation
+      setIsLoggingOut(true)
+      revokeAsync(
+        { token: userToken, clientId: CLIENT_ID }, 
+        { revocationEndpoint: twitchEndpoints.revocation }
+      )
     } catch (error) {
     } finally {
-      // set user state to an empty User object
-      // set userToken state to an empty string
-
-      // remove "access_token" from request's authorization header
-
-      // set isLoggingOut to false
+      setUser({} as User);
+      setUserToken('');
+      setIsLoggingOut(false)
     }
   }
-
-  useEffect(() => {
-    // add client_id to request's "Client-Id" header
-  }, [])
 
   return (
     <AuthContext.Provider value={{ user, isLoggingOut, isLoggingIn, signIn, signOut }}>
