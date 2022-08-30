@@ -39,14 +39,20 @@ type AuthResponse = {
   type: string;
 }
 
+const { CLIENT_ID } = process.env;
+
+const REDIRECT_URI = makeRedirectUri({ useProxy: true  });
+const RESPONSE_TYPE = 'token';
+const SCOPE = encodeURI('openid user:read:email user:read:follows');
+const FORCE_VERIFY = true;
+const STATE = generateRandom(30);
+
 function AuthProvider({ children }: AuthProviderData) {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [user, setUser] = useState({} as User);
   const [userToken, setUserToken] = useState('');
-
-  const { CLIENT_ID } = process.env;
 
   useEffect(() => {
     api.defaults.headers.common['Client-Id'] = CLIENT_ID as string | number | boolean;
@@ -55,13 +61,7 @@ function AuthProvider({ children }: AuthProviderData) {
   async function signIn() {
     try {
       setIsLoggingIn(true);
-
-      const REDIRECT_URI = makeRedirectUri({ path: 'https://auth.expo.io/@gabrielmerigo/streamData', useProxy: true  })
-      const RESPONSE_TYPE = 'token';
-      const SCOPE = encodeURI('openid user:read:email user:read:follows');
-      const FORCE_VERIFY = true;
-      const STATE = generateRandom(30);
-
+ 
       const authUrl = twitchEndpoints.authorization + 
         `?client_id=${CLIENT_ID}` + 
         `&redirect_uri=${REDIRECT_URI}` + 
@@ -70,7 +70,7 @@ function AuthProvider({ children }: AuthProviderData) {
         `&force_verify=${FORCE_VERIFY}` +
         `&state=${STATE}`;
 
-      const { params, type } = await startAsync({ authUrl }) as AuthResponse;
+      const { type, params } = await startAsync({ authUrl }) as AuthResponse;
 
       if(type === 'success' && params.error !== 'access_denied'){
         if(params.state !== STATE){
@@ -78,20 +78,7 @@ function AuthProvider({ children }: AuthProviderData) {
         }
 
         api.defaults.headers.common['Authorization'] = `Bearer ${params.access_token}`;
-        const userResponse = await api.get('/users');
-        console.log(userResponse.data);
       }
-
-      // verify if startAsync response.type equals "success" and response.params.error differs from "access_denied"
-      // if true, do the following:
-
-        // verify if startAsync response.params.state differs from STATE
-        // if true, do the following:
-          // throw an error with message "Invalid state value"
-
-        // add access_token to request's authorization header
-
-        // call Twitch API's users route
 
         // set user state with response from Twitch API's route "/users"
         // set userToken state with response's access_token from startAsync
